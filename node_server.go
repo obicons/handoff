@@ -197,14 +197,14 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("ReceiveCheckpointHandler(): unable to read directory")
 		return
+	} else if len(files) != 1 {
+		fmt.Println("ReceiveCheckpointHandler(): unexpected archive directory")
+		return
 	}
 
-	//var extractedFile string
-	for _, info := range files {
-		fmt.Println(info.Name())
-	}
+	dirName := files[0].Name()
 
-	if err = restoreFromFile(filename); err != nil {
+	if err = restoreFromFile(dirName); err != nil {
 		fmt.Println("ReceiveCheckpointHandler(): can't restore from file")
 		return
 	}
