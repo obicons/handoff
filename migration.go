@@ -11,7 +11,6 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/shirou/gopsutil/process"
 	"github.com/mholt/archiver"
-	// "github.com/vishvananda/netns"
 	"net/http"
 	"os"
 	"runtime"

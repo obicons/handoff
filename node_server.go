@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"github.com/mholt/archiver"	
 )
 
 type StartMigrationRequest struct {
@@ -183,6 +184,12 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	io.Copy(file, r.Body)
+
+	dst := fmt.Sprintf("./%d-restore/")
+	if err = archiver.Unarchive(filename, dst); err != nil {
+		fmt.Println("ReceiveCheckpointHandler(): unable to unarchive file")
+		return
+	}
 
 	if err = restoreFromFile(filename); err != nil {
 		fmt.Println("ReceiveCheckpointHandler(): can't restore from file")
