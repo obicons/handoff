@@ -11,8 +11,10 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/shirou/gopsutil/process"
 	"github.com/mholt/archiver"
+	// "github.com/vishvananda/netns"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,7 +56,6 @@ func (c criuNotifier) NetworkLock() error { return nil }
 func (c criuNotifier) NetworkUnlock() error { return nil }
 func (c criuNotifier) SetupNamespaces(p int32) error { return nil }
 func (c criuNotifier) PostSetupNamespaces() error { return nil }
-func (c criuNotifier) PostResume() error { return nil }
 
 // after we finish a dump, we send it to the destination of the migration
 func (c criuNotifier) PostDump() error {
@@ -83,6 +84,13 @@ func (c criuNotifier) PostDump() error {
 	return nil
 }
 
+func (c criuNotifier) PostResume() error {
+	// TODO - we need to notify the caller that we are done with the restoration process
+	
+	
+	return nil
+}
+
 func registerProcess(p Process) {
 	exists, _ := process.PidExists(p.Pid)
 	if !exists {
@@ -105,8 +113,7 @@ func doMigration(request StartMigrationRequest) {
 
 	process, ok := iprocess.(Process)
 	if !ok {
-		fmt.Println("error: pid not associated with a Process")
-		return
+		panic("error: pid not associated with a Process")
 	}
 
 	// step 2: initialize clocks and verify we're not already migrating
@@ -119,9 +126,13 @@ func doMigration(request StartMigrationRequest) {
 
 	clock, ok := iclock.(*MigrationClock)
 	if !ok {
-		fmt.Println("error: process not associated with *MigrationClock")
-		return
+		panic("error: process not associated with *MigrationClock")
 	}
+
+	mutex := &sync.Mutex{}
+	quitChan := make(chan bool)
+	process.DoneChan = quitChan
+	Processes.Store(request.Pid, process)
 
 	// step 3: inform Destination that we are migrating the process
 	if err := doInformDestination(request.Destination, process, clock); err != nil {
@@ -129,11 +140,9 @@ func doMigration(request StartMigrationRequest) {
 		return
 	}
 
-	mutex := &sync.Mutex{}
-	quitChan := make(chan bool)
-
 	// step 4 a: shadow traffic
-	go forwardProcessTraffic(process, request.Destination, clock, mutex, quitChan)
+	go forwardProcessTraffic(process, request.Destination,
+		                 clock, mutex, quitChan)
 
 	// step 4 b: (i) checkpoint and (ii) send process
 	// (i)
@@ -208,8 +217,9 @@ func doInformDestination(target string, process Process, clock *MigrationClock) 
 	return nil
 }
 
-func forwardProcessTraffic(p Process, dst string, clck *MigrationClock, m *sync.Mutex,
-	done chan bool) {
+func forwardProcessTraffic(p Process, dst string,
+	                   clck *MigrationClock, m *sync.Mutex,
+	                   done chan bool) {
 	// iface defined in main.go
 	handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)
 	if err != nil {
@@ -271,4 +281,47 @@ func forwardProcessTraffic(p Process, dst string, clck *MigrationClock, m *sync.
 	}
 }
 
-// TODO - restore the process, rebuild netns
+func restoreFromFile(path string) error {
+	// create a file descriptor pointing of the image directory
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// prevent anything weird from happening
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	// use the virtual_network.go interface to setup a new netns
+	newns, err := setupNetNs()
+	if err != nil {
+		return err
+	}
+	defer newns.Close()	
+
+	// setup the restore procedure
+	fd := int32(file.Fd())
+	shellJob := true
+	inheritFdKey := "extRootNetNS"
+	netnsFd := int32(newns)
+
+	inheritFd := rpc.InheritFd{
+		Key: &inheritFdKey,
+		Fd: &netnsFd,
+	}
+
+	opts := rpc.CriuOpts{
+		ImagesDirFd: &fd,
+		ShellJob: &shellJob,
+		InheritFd: []*rpc.InheritFd{&inheritFd},
+	}
+	
+	restorer := criu.MakeCriu()
+	notifier := criuNotifier{}
+	if err = restorer.Restore(opts, notifier); err != nil {
+		fmt.Println("error: unable to restore process")
+	}
+
+	return nil
+}

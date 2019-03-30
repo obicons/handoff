@@ -17,9 +17,12 @@ type StartMigrationRequest struct {
 }
 
 type Process struct {
-	Pid      int32    // PID of the process
-	TcpPorts []uint16 // TCP ports the process listens on
-	UdpPorts []uint16 // UDP ports the process listens on
+	Pid      int32     // PID of the process
+	TcpPorts []uint16  // TCP ports the process listens on
+	UdpPorts []uint16  // UDP ports the process listens on
+	DoneChan chan bool   `json:"-"` // channel used to end traffic forwarding
+	Packets  [][]byte    `json:"-"` // each []byte is a packet
+	Lock     *sync.Mutex `json:"-"` // lock
 }
 
 var (
@@ -93,14 +96,29 @@ func ForwardTrafficHandler(w http.ResponseWriter, r *http.Request) {
 
 	clock, ok := iclock.(*MigrationClock)
 	if !ok {
-		fmt.Println("error: process not associated with *MigrationClock")
-		return
+		panic("error: process not associated with *MigrationClock")
 	}
 
 	mutex.Lock()
 	clock.DestinationTime += 1
 	clock.SourceTime = request.Clock.SourceTime
 	mutex.Unlock()
+
+	iprocess, ok := Processes.Load(request.Pid)
+	if !ok {
+		fmt.Println("ForwardTraffic(): no pid in Processes for migration")
+		return
+	}
+
+	process, ok := iprocess.(Process)
+	if !ok {
+		panic("error: pid not associated with a Process in Processes")
+	}
+
+	// add the frames
+	process.Lock.Lock()
+	process.Packets = append(process.Packets, request.Frame)
+	process.Lock.Unlock()
 
 	// TODO - actually forward the traffic!
 	fmt.Println(request)
@@ -122,6 +140,10 @@ func SlaveStartMigrationHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// create a lock for this process
+	mutex := sync.Mutex{}
+	request.Process.Lock = &mutex
 
 	// Processes and MigrationClocks are defined in migration.go
 	Processes.Store(request.Process.Pid, request.Process)
@@ -152,7 +174,8 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := os.Create(fmt.Sprintf("./%d.tar.gz", pid))
+	filename := fmt.Sprintf("./%d.tar.gz", pid)
+	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Println("ReceiveCheckpointHandler(): can't create file")
 		return
@@ -160,4 +183,56 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	io.Copy(file, r.Body)
+
+	if err = restoreFromFile(filename); err != nil {
+		fmt.Println("ReceiveCheckpointHandler(): can't restore from file")
+		return
+	}
+}
+
+func FinishRestoreHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		fmt.Println("FinishCheckpointHandler(): error parsing")
+	}
+
+	spid, ok := r.Form["pid"]
+	if !ok {
+		fmt.Println("FinishCheckpointHandler(): no pid")
+		return
+	}
+
+	pid, err := strconv.ParseInt(spid[0], 10, 32)
+	if err != nil {
+		fmt.Println("FinishCheckpointHandler(): non-numeric PID")
+		return
+	}
+
+	process, err := os.FindProcess(int(pid))
+
+	// TODO - we should see about garbage collecting all the system resources
+	// (e.g. veth pairs) used by process
+
+	if err != nil {
+		fmt.Println("FinishRestoreHandler(): unable to locate pid")
+		return
+	}
+
+	if err = process.Kill(); err != nil {
+		fmt.Println("FinishRestoreHandler(): unable to kill pid")
+		return
+	}
+
+	iinternalProcess, ok := Processes.Load(pid)
+	if !ok {
+		fmt.Println("FinishRestoreHandler(): unable to load pid")
+		return
+	}
+
+	internalProcess, ok := iinternalProcess.(Process)
+	if !ok {
+		fmt.Println("FinishRestoreHandler(): pid not associated with process")
+		return
+	}
+
+	internalProcess.DoneChan <- true
 }

@@ -71,126 +71,6 @@ func verifyBridgePresence(bridgeCidr string) error {
 }
 
 func execInNetNS(command string, args []string) error {
-	// bridge, err := netlink.LinkByName(BridgeName)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // create a new veth interface
-	// countStr := strconv.FormatUint(vethCount, 10)
-	// veth := &netlink.Veth{
-	// 	LinkAttrs: netlink.LinkAttrs{
-	// 		Name: "hveth" + countStr,
-	// 		MTU:  1500},
-	// 	PeerName: "brveth" + countStr,
-	// }
-
-	// if len(freeIPs) == 0 {
-	// 	return errors.New("No more IPs left in virtual network")
-	// }
-
-	// if err = netlink.LinkAdd(veth); err != nil {
-	// 	return err
-	// }
-
-	// // attach the peer to the bridge
-	// peerIdx, err := netlink.VethPeerIndex(veth)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// peer, err := netlink.LinkByIndex(peerIdx)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// rbridge := netlink.Bridge{LinkAttrs: *(bridge.Attrs())}
-	// if netlink.LinkSetMaster(peer, &rbridge) != nil {
-	// 	return err
-	// }
-
-	// // now we create a new network namespace
-	// runtime.LockOSThread()
-	// defer runtime.UnlockOSThread()
-
-	// oldns, err := netns.Get()
-	// defer oldns.Close()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// nshandle, err := netns.New()
-	// // defer nshandle.Close()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// err = netns.Set(oldns)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// veth.PeerName = "" // prevents moving peer into namespace
-	// err = netlink.LinkSetNsFd(veth, int(nshandle))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // set both ends of the veth up
-	// err = netlink.LinkSetUp(peer)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // enter the netns
-	// if err = netns.Set(nshandle); err != nil {
-	// 	return err
-	// }
-
-	// // rename vethn to eth0
-	// if err = netlink.LinkSetName(veth, "eth0"); err != nil {
-	// 	return err
-	// }
-
-	// // and set it up
-	// if err = netlink.LinkSetUp(veth); err != nil {
-	// 	return err
-	// }
-
-	// // and set up lo
-	// setupLoopback()
-
-	// // and assign it an IP
-	// // TODO -- protect me!
-	// vethAddr := freeIPs[0]
-	// freeIPs = freeIPs[1:]
-	// vethCount += 1
-
-	// addr, err := netlink.ParseAddr(vethAddr + "/32")
-	// if err != nil {
-	// 	return err
-	// }
-	// netlink.AddrAdd(veth, addr)
-
-	// bridgeRoute, err := makeBridgeNetRoute(veth.Attrs().Index)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if err = netlink.RouteAdd(&bridgeRoute); err != nil {
-	// 	return err
-	// }
-
-	// // add the default route
-	// defaultRoute, err := makeDefaultRoute(veth.Attrs().Index)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if err = netlink.RouteAdd(&defaultRoute); err != nil {
-	// 	return err
-	// }
-
 	newns, err := setupNetNs()
 	if err != nil {
 		return err
@@ -201,11 +81,6 @@ func execInNetNS(command string, args []string) error {
 	if err != nil {
 		return err
 	}
-	// defer func() {
-	// 	if err := netns.Set(oldns); err != nil {
-	// 		panic("execInNetNS(): error restoring old netns")
-	// 	}
-	// }()
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -223,40 +98,7 @@ func execInNetNS(command string, args []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
-	// cmdErr := cmd.Start()
 	cmd.Start()	
-
-	// once again, restore netns
-	// if err = netns.Set(oldns); err != nil {
-	// 	panic("execInNetNS(): error restoring old netns")
-	// }
-
-	// for testing...
-	// go func() {
-	// 	if cmdErr != nil {
-	// 		fmt.Println("error executing", command)
-	// 		fmt.Println(cmdErr)
-	// 		return
-	// 	}
-
-	// 	reader := bufio.NewReader(out)
-	// 	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
-	// 		fmt.Println(line)
-	// 	}
-	// }()
-
-	// go func() {
-	// 	if cmdErr != nil {
-	// 		fmt.Println("error executing", command)
-	// 		fmt.Println(cmdErr)
-	// 		return
-	// 	}
-
-	// 	reader := bufio.NewReader(stderr)
-	// 	for line, err := reader.ReadString('\n'); err == nil; line, err = reader.ReadString('\n') {
-	// 		fmt.Println(line)
-	// 	}
-	// }()
 
 	if err = restoreOldNs(saveLocation); err != nil {
 		panic("unable to restore old network namespace")
@@ -311,7 +153,6 @@ func setupNetNs() (netns.NsHandle, error) {
 	defer runtime.UnlockOSThread()
 
 	oldns, err := netns.Get()
-	defer oldns.Close()
 	if err != nil {
 		return handle, err
 	}
@@ -326,6 +167,8 @@ func setupNetNs() (netns.NsHandle, error) {
 		if err != nil {
 			panic("setupNetNs: error restoring old namespace")
 		}
+
+		oldns.Close()
 	}()
 
 	err = netns.Set(oldns)
@@ -364,10 +207,11 @@ func setupNetNs() (netns.NsHandle, error) {
 	setupLoopback()
 
 	// and assign it an IP
-	// TODO -- protect me!
+	mutex.Lock()
 	vethAddr := freeIPs[0]
 	freeIPs = freeIPs[1:]
 	vethCount += 1
+	mutex.Unlock()
 
 	addr, err := netlink.ParseAddr(vethAddr + "/32")
 	if err != nil {

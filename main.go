@@ -55,5 +55,6 @@ func main() {
 	http.HandleFunc("/ForwardTraffic", ForwardTrafficHandler)
 	http.HandleFunc("/SlaveStartMigration", SlaveStartMigrationHandler)
 	http.HandleFunc("/Checkpoints", ReceiveCheckpointHandler)
+	http.HandleFunc("/FinishRestore", FinishRestoreHandler)
 	http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 }
