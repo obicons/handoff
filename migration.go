@@ -149,6 +149,7 @@ func doMigration(request StartMigrationRequest) {
 	leaveRunning := true
 	shellJob := true
 	outputDir := strconv.FormatInt(time.Now().Unix(), 10)
+	orphanPtsMaster := true
 
 	if err := os.Mkdir(outputDir, 0666); err != nil {
 		fmt.Println(err)
@@ -170,7 +171,9 @@ func doMigration(request StartMigrationRequest) {
 		ShellJob: &shellJob,
 		Pid: &process.Pid,
 		ImagesDirFd: &fd,
-		External: []string{fmt.Sprintf("net[%d]:extRootNetNS", netnsInode(request.Pid))}}
+		External: []string{fmt.Sprintf("net[%d]:extRootNetNS", netnsInode(request.Pid))},
+		OrphanPtsMaster: &orphanPtsMaster,
+	}
 
 	watcher := criuNotifier{
 		imageDir: outputDir,
