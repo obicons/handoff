@@ -202,7 +202,7 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dirName := files[0].Name()
+	dirName := fmt.Sprintf("./%s/%s", dst, files[0].Name())
 
 	if err = restoreFromFile(dirName); err != nil {
 		fmt.Println("ReceiveCheckpointHandler(): can't restore from file")
