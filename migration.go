@@ -304,6 +304,7 @@ func restoreFromFile(path string) error {
 	shellJob := true
 	inheritFdKey := "extRootNetNS"
 	netnsFd := int32(newns)
+	shellTty := true
 
 	inheritFd := rpc.InheritFd{
 		Key: &inheritFdKey,
@@ -314,6 +315,7 @@ func restoreFromFile(path string) error {
 		ImagesDirFd: &fd,
 		ShellJob: &shellJob,
 		InheritFd: []*rpc.InheritFd{&inheritFd},
+		OrphanPtsMaster: &shellTty,
 	}
 	
 	restorer := criu.MakeCriu()
