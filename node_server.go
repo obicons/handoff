@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"	
 	"net/http"
 	"os"
 	"strconv"
@@ -185,10 +186,22 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 
 	io.Copy(file, r.Body)
 
-	dst := fmt.Sprintf("./%d-restore/")
+	dst := fmt.Sprintf("./%d-restore/", pid)
 	if err = archiver.Unarchive(filename, dst); err != nil {
 		fmt.Println("ReceiveCheckpointHandler(): unable to unarchive file")
 		return
+	}
+
+	// find where this was extracted to
+	files, err := ioutil.ReadDir(dst)
+	if err != nil {
+		fmt.Println("ReceiveCheckpointHandler(): unable to read directory")
+		return
+	}
+
+	//var extractedFile string
+	for _, info := range files {
+		fmt.Println(info.Name())
 	}
 
 	if err = restoreFromFile(filename); err != nil {
