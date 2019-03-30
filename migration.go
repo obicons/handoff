@@ -13,7 +13,7 @@ import (
 	"github.com/mholt/archiver"
 	"net/http"
 	"os"
-	"runtime"
+	//"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -283,49 +283,53 @@ func forwardProcessTraffic(p Process, dst string,
 	}
 }
 
-func restoreFromFile(path string) error {
-	// create a file descriptor pointing of the image directory
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+// func restoreFromFile(path string) error {
+// 	// create a file descriptor pointing of the image directory
+// 	file, err := os.Open(path)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer file.Close()
 
-	// prevent anything weird from happening
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+// 	// prevent anything weird from happening
+// 	runtime.LockOSThread()
+// 	defer runtime.UnlockOSThread()
 
-	// use the virtual_network.go interface to setup a new netns
-	newns, err := setupNetNs()
-	if err != nil {
-		return err
-	}
-	defer newns.Close()	
+// 	// use the virtual_network.go interface to setup a new netns
+// 	newns, err := setupNetNs()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer newns.Close()	
 
-	// setup the restore procedure
-	fd := int32(file.Fd())
-	shellJob := true
-	inheritFdKey := "extRootNetNS"
-	netnsFd := int32(newns)
-	shellTty := true
+// 	// setup the restore procedure
+// 	fd := int32(file.Fd())
+// 	shellJob := true
+// 	inheritFdKey := "extRootNetNS"
+// 	netnsFd := int32(newns)
+// 	shellTty := true
 
-	inheritFd := rpc.InheritFd{
-		Key: &inheritFdKey,
-		Fd: &netnsFd,
-	}
+// 	inheritFd := rpc.InheritFd{
+// 		Key: &inheritFdKey,
+// 		Fd: &netnsFd,
+// 	}
 
-	opts := rpc.CriuOpts{
-		ImagesDirFd: &fd,
-		ShellJob: &shellJob,
-		InheritFd: []*rpc.InheritFd{&inheritFd},
-		OrphanPtsMaster: &shellTty,
-	}
+// 	opts := rpc.CriuOpts{
+// 		ImagesDirFd: &fd,
+// 		ShellJob: &shellJob,
+// 		InheritFd: []*rpc.InheritFd{&inheritFd},
+// 		OrphanPtsMaster: &shellTty,
+// 	}
 	
-	restorer := criu.MakeCriu()
-	notifier := criuNotifier{}
-	if err = restorer.Restore(opts, notifier); err != nil {
-		fmt.Println("error: unable to restore process")
-	}
+// 	restorer := criu.MakeCriu()
+// 	notifier := criuNotifier{}
+// 	if err = restorer.Restore(opts, notifier); err != nil {
+// 		fmt.Println("error: unable to restore process")
+// 	}
 
-	return nil
+// 	return nil
+// }
+
+func restoreFromFile(path string) error {
+	return execInNetNS("./restore.sh", []string{path})
 }
