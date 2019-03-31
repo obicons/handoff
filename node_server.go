@@ -23,8 +23,7 @@ type Process struct {
 	TcpPorts []uint16  // TCP ports the process listens on
 	UdpPorts []uint16  // UDP ports the process listens on
 	DoneChan chan bool   `json:"-"` // channel used to end traffic forwarding
-	Packets  [][]byte    `json:"-"` // each []byte is a packet
-	Lock     *sync.Mutex `json:"-"` // lock
+	Packets  chan []byte `json:"-"` // each []byte is a packet
 }
 
 var (
@@ -118,9 +117,12 @@ func ForwardTrafficHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// add the frames
-	process.Lock.Lock()
-	process.Packets = append(process.Packets, request.Frame)
-	process.Lock.Unlock()
+	//process.Lock.Lock()
+	go func() {
+		process.Packets <- request.Frame
+	}()
+	//process.Packets = append(process.Packets, request.Frame)
+	//process.Lock.Unlock()
 
 	// TODO - actually forward the traffic!
 	fmt.Println(request)
@@ -144,18 +146,15 @@ func SlaveStartMigrationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a lock for this process
-	mutex := sync.Mutex{}
-	request.Process.Lock = &mutex
+	//mutex := sync.Mutex{}
+	//request.Process.Lock = &mutex
+	request.Process.Packets = make(chan []byte, 256)
 
 	// Processes and MigrationClocks are defined in migration.go
 	Processes.Store(request.Process.Pid, request.Process)
 	MigrationClocks.Store(request.Process.Pid, &request.Clock)
 
 	fmt.Printf("Migration for %d started...\n", request.Process.Pid)
-
-	// TODO - create a new network namespace.
-	// Then, create a veth pair and connect to bridge. do not update route tables yet.
-	// Write the raw ethernet frame to the veth pair
 }
 
 func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
@@ -208,6 +207,8 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("ReceiveCheckpointHandler(): can't restore from file")
 		return
 	}
+
+	go forwardTraffic(int32(pid))
 }
 
 func FinishRestoreHandler(w http.ResponseWriter, r *http.Request) {

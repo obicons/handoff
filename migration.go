@@ -240,7 +240,7 @@ func forwardProcessTraffic(p Process, dst string,
 	}
 
 	filterStr = strings.Trim(filterStr, " or")
-	fmt.Println("net filter:", filterStr)
+	//fmt.Println("net filter:", filterStr)
 
 	if err := handle.SetBPFFilter(filterStr); err != nil {
 		fmt.Println(err)
@@ -261,6 +261,8 @@ func forwardProcessTraffic(p Process, dst string,
 			clck.SourceTime += 1
 			msgClock := *clck
 			m.Unlock()
+
+			//fmt.Println(packet)
 
 			// create the message
 			msg := ShadowTrafficMessage{msgClock, packet.Data(), p.Pid}
@@ -283,53 +285,32 @@ func forwardProcessTraffic(p Process, dst string,
 	}
 }
 
-// func restoreFromFile(path string) error {
-// 	// create a file descriptor pointing of the image directory
-// 	file, err := os.Open(path)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer file.Close()
-
-// 	// prevent anything weird from happening
-// 	runtime.LockOSThread()
-// 	defer runtime.UnlockOSThread()
-
-// 	// use the virtual_network.go interface to setup a new netns
-// 	newns, err := setupNetNs()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer newns.Close()	
-
-// 	// setup the restore procedure
-// 	fd := int32(file.Fd())
-// 	shellJob := true
-// 	inheritFdKey := "extRootNetNS"
-// 	netnsFd := int32(newns)
-// 	shellTty := true
-
-// 	inheritFd := rpc.InheritFd{
-// 		Key: &inheritFdKey,
-// 		Fd: &netnsFd,
-// 	}
-
-// 	opts := rpc.CriuOpts{
-// 		ImagesDirFd: &fd,
-// 		ShellJob: &shellJob,
-// 		InheritFd: []*rpc.InheritFd{&inheritFd},
-// 		OrphanPtsMaster: &shellTty,
-// 	}
-	
-// 	restorer := criu.MakeCriu()
-// 	notifier := criuNotifier{}
-// 	if err = restorer.Restore(opts, notifier); err != nil {
-// 		fmt.Println("error: unable to restore process")
-// 	}
-
-// 	return nil
-// }
-
 func restoreFromFile(path string) error {
 	return execInNetNS("./restore.sh", []string{path})
+}
+
+
+func forwardTraffic(p int32) {
+	iprocess, ok := Processes.Load(p)
+	if !ok {
+		fmt.Println("no process found with pid " + string(p))
+		return
+	}
+
+	process, ok := iprocess.(Process)
+	if !ok {
+		panic("pid not associated with Process")
+	}
+
+	handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)	
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for packet := range process.Packets {
+		if err = handle.WritePacketData(packet); err != nil {
+			fmt.Println(err)
+		}
+	}
 }
