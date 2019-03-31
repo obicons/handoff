@@ -309,6 +309,7 @@ func forwardTraffic(p int32) {
 	}
 
 	for packet := range process.Packets {
+		fmt.Println("HERE!")
 		if err = handle.WritePacketData(packet); err != nil {
 			fmt.Println(err)
 		}

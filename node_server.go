@@ -123,9 +123,6 @@ func ForwardTrafficHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 	//process.Packets = append(process.Packets, request.Frame)
 	//process.Lock.Unlock()
-
-	// TODO - actually forward the traffic!
-	fmt.Println(request)
 }
 
 func SlaveStartMigrationHandler(w http.ResponseWriter, r *http.Request) {
