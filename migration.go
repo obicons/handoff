@@ -303,23 +303,14 @@ func forwardTraffic(p int32) {
 		panic("pid not associated with Process")
 	}
 
-	// handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)	
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-
 	for packet := range process.Packets {
 		//fmt.Println("HERE!")
 		decodedPacket := gopacket.NewPacket(packet, layers.LayerTypeEthernet, gopacket.Default)
 		if udpLayer := decodedPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
+			castedLayer, _ := udpLayer.(*layers.UDP)
 			fmt.Println("Received a UDP packet!")
-
+			fmt.Println(castedLayer.SrcPort)
 			fmt.Println(string(udpLayer.LayerPayload()))
 		}
-
-		// if err = handle.WritePacketData(packet); err != nil {
-		// 	fmt.Println(err)
-		// }
 	}
 }
