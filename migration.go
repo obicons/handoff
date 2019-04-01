@@ -312,7 +312,7 @@ func forwardTraffic(p int32) {
 			castedLayer, _ := ipLayer.(*layers.IPv4)
 			ip = castedLayer.DstIP
 		} else {
-			return
+			continue
 		}
 
 		var port uint16
@@ -322,14 +322,15 @@ func forwardTraffic(p int32) {
 			port = uint16(castedLayer.DstPort)
 			payload = castedLayer.Payload
 		} else {
-			return
+			continue
 		}
 
 		conn, err := net.Dial("udp",
 			fmt.Sprintf("%s:%d", string(ip), port))
 		if err != nil {
+			fmt.Println(err)
 			fmt.Println("error sending packet")
-			return
+			continue
 		}
 
 		conn.Write(payload)
