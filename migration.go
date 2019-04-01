@@ -12,6 +12,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/shirou/gopsutil/process"
 	"github.com/mholt/archiver"
+	"net"
 	"net/http"
 	"os"
 	//"runtime"
@@ -304,13 +305,20 @@ func forwardTraffic(p int32) {
 	}
 
 	for packet := range process.Packets {
-		//fmt.Println("HERE!")
 		decodedPacket := gopacket.NewPacket(packet, layers.LayerTypeEthernet, gopacket.Default)
+
+		var ip net.IP
+
+		if ipLayer := decodedPacket.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+			castedLayer, _ := ipLayer.(*layers.IPv4)
+			ip = castedLayer.DstIP
+		}
+		fmt.Println(ip)
+
 		if udpLayer := decodedPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			castedLayer, _ := udpLayer.(*layers.UDP)
-			fmt.Println("Received a UDP packet!")
-			fmt.Println(castedLayer.SrcPort)
-			fmt.Println(string(udpLayer.LayerPayload()))
+			port := castedLayer.DstPort
+			fmt.Println(port)
 		}
 	}
 }
