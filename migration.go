@@ -15,7 +15,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	//"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -81,6 +80,9 @@ func (c criuNotifier) PostDump() error {
 		return nil
 	}
 	defer res.Body.Close()
+
+	os.Remove(c.imageDir + ".tar.gz")
+	os.RemoveAll(c.imageDir)
 
 	return nil
 }

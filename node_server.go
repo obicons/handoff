@@ -205,6 +205,8 @@ func ReceiveCheckpointHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	os.Remove(filename)
+
 	go forwardTraffic(int32(pid))
 }
 

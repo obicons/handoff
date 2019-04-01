@@ -12,3 +12,5 @@ exec 50</proc/$$/ns/net
 criu restore -D "$RESTORE_PATH" \
      --shell-job \
      --inherit-fd 'fd[50]:extRootNetNS'
+
+rm -r "$RESTORE_PATH"
