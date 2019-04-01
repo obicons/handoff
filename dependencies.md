@@ -6,6 +6,7 @@ go: github.com/vishvananda/netns
 go: github.com/coreos/go-iptables/iptables
 go: github.com/mholt/archiver
 go: github.com/docker/docker/pkg/mount
+go: github.com/google/gopacket/layers
 system: libpcap-dev
 system: criu
 

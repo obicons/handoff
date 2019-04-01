@@ -8,6 +8,7 @@ import (
 	"github.com/checkpoint-restore/go-criu"
 	"github.com/checkpoint-restore/go-criu/rpc"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/shirou/gopsutil/process"
 	"github.com/mholt/archiver"
@@ -262,8 +263,8 @@ func forwardProcessTraffic(p Process, dst string,
 			msgClock := *clck
 			m.Unlock()
 
-			//fmt.Println(packet)
-
+			//fmt.Println("HERE")
+			
 			// create the message
 			msg := ShadowTrafficMessage{msgClock, packet.Data(), p.Pid}
 			jsonBytes, err := json.Marshal(msg)
@@ -302,16 +303,21 @@ func forwardTraffic(p int32) {
 		panic("pid not associated with Process")
 	}
 
-	handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)	
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)	
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
 	for packet := range process.Packets {
-		fmt.Println("HERE!")
-		if err = handle.WritePacketData(packet); err != nil {
-			fmt.Println(err)
+		//fmt.Println("HERE!")
+		decodedPacket := gopacket.NewPacket(packet, layers.LayerTypeEthernet, gopacket.Default)
+		if udpLayer := decodedPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
+			fmt.Println("Received a UDP packet!")
 		}
+
+		// if err = handle.WritePacketData(packet); err != nil {
+		// 	fmt.Println(err)
+		// }
 	}
 }

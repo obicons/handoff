@@ -45,10 +45,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = execInNetNS("nc", []string{"-lk", "0.0.0.0", "5000"}); err != nil {
+	// if err = execInNetNS("nc", []string{"-ulk", "0.0.0.0", "5000"}); err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
+
+	if err = execInNetNS("bash", []string{"-c", "while [ 1 ]; do nc -ul 0.0.0.0 5000; done"}); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
 
 	http.HandleFunc("/StartMigration", StartMigrationHandler)
 	http.HandleFunc("/RegisterProcess", RegisterProcessHandler)
