@@ -308,17 +308,31 @@ func forwardTraffic(p int32) {
 		decodedPacket := gopacket.NewPacket(packet, layers.LayerTypeEthernet, gopacket.Default)
 
 		var ip net.IP
-
 		if ipLayer := decodedPacket.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 			castedLayer, _ := ipLayer.(*layers.IPv4)
 			ip = castedLayer.DstIP
+		} else {
+			return
 		}
-		fmt.Println(ip)
 
+		var port uint16
+		var payload []byte
 		if udpLayer := decodedPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			castedLayer, _ := udpLayer.(*layers.UDP)
-			port := castedLayer.DstPort
-			fmt.Println(port)
+			port = uint16(castedLayer.DstPort)
+			payload = castedLayer.Payload
+		} else {
+			return
 		}
+
+		conn, err := net.Dial("udp",
+			fmt.Sprintf("%s:%d", string(ip), port))
+		if err != nil {
+			fmt.Println("error sending packet")
+			return
+		}
+
+		conn.Write(payload)
+		conn.Close()
 	}
 }
