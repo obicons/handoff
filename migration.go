@@ -314,6 +314,8 @@ func forwardTraffic(p int32) {
 		decodedPacket := gopacket.NewPacket(packet, layers.LayerTypeEthernet, gopacket.Default)
 		if udpLayer := decodedPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			fmt.Println("Received a UDP packet!")
+
+			fmt.Println(string(udpLayer.LayerPayload()))
 		}
 
 		// if err = handle.WritePacketData(packet); err != nil {
