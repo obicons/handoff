@@ -326,7 +326,7 @@ func forwardTraffic(p int32) {
 		}
 
 		conn, err := net.Dial("udp",
-			fmt.Sprintf("%s:%d", string(ip), port))
+			fmt.Sprintf("%s:%d", ip.String(), port))
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("error sending packet")
